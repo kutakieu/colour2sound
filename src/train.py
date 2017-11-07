@@ -126,7 +126,7 @@ def load_generic_from_saved_audio_video(directory, file, sample_rate, Mfcc_Inver
     skipEvery = 3 if fps==30 else 5 if fps==25 else 6 if fps==24 else None
 
     res = []
-    while i < (num_frames/60):
+    while i < (num_frames/2):
         # print("here")
         # print(i)
         if i % 10 == 0:

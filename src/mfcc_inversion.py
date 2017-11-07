@@ -5,6 +5,8 @@ from scipy.io import wavfile
 from scipy.signal import butter, lfilter
 import scipy.ndimage
 import librosa
+import sounddevice as sd
+from multiprocessing import Process
 
 # fft_size = 1024 # window size for the FFT
 # step_size = fft_size/16 # distance to slide along the window (in time)
@@ -385,8 +387,86 @@ class MfccInversion(object):
 
         return inverted_mel_audio
 
+def play_sound(audio):
+
+    if audio is not None:
+        print("here")
+        sd.play(audio, 44100)
 
 def main():
+    a = np.zeros(44100)
+    mfccInversion = MfccInversion()
+    rate, data = wavfile.read('../data/pokemon/001.wav')
+    data -= 128
+    np.left_shift(data, 8)
+    # sd.play(data, 22050)
+    print(data[:10,0])
+    # a[:data.shape[0]] = data[:,0]
+    # rate, data = wavfile.read('../data/sorry.wav')
+    # print(data[10000:11000,0])
+    # print(a.shape)
+    mfcc1 = mfccInversion.sound2mfcc(data, 22050)
+    audio = mfccInversion.mfcc2sound(mfcc1)
+    print(audio.shape)
+    sd.play(audio, 22050)
+    print(mfcc1.shape)
+    exit()
+    # rate, data = wavfile.read('../data/save/0_2.wav')
+    # mfcc2 = mfccInversion.sound2mfcc(data[44100 * 100:44100 * 101, 0], rate)
+    # print(mfcc2.shape)
+    # # exit()
+    # mfcc = (mfcc1 + mfcc2)/2
+    # # print(mfcc[0,:])
+    # print(mfcc2.max())
+
+    # p = Process(target=play_sound, args=(None,))
+    # p.start()
+    # mfcc = np.random.randn(32, 32)
+    # audio = mfccInversion.mfcc2sound(mfcc)
+    # p = Process(target=play_sound, args=(audio,))
+    # p.start()
+
+    for i in range(10):
+        mfcc = np.random.randn(32,32)
+        audio = mfccInversion.mfcc2sound(mfcc)
+        # wavfile.write('reconstruct_from_random_' + str(i) + '.wav', 44100, audio)
+        print("here")
+        sd.play(audio, 44100, loop=True)
+        # play_sound(audio)
+        # p.join()
+        # p = Process(target=play_sound, args=(audio,))
+        # p.start()
+
+    exit()
+
+    rate1, data1 = wavfile.read('../data/save/0_1.wav')
+    rate2, data2 = wavfile.read('../data/save/0_2.wav')
+
+    print(data1.max())
+    print(data2.max())
+
+    print(data1.shape)
+    print(rate1)
+    print(data2.shape)
+    print(rate2)
+
+    new_audio = (data1 + data2)/2
+
+    _max = new_audio.max()
+    _min = new_audio.min()
+    if _max + _min > 0:
+        norm = 1 / _max * 0x8000
+    else:
+        norm = 1 / _min * -0x8000
+    new_audio *= norm
+    new_audio = new_audio.astype("int16")
+
+    print(new_audio.max())
+
+    wavfile.write('mixed_audio.wav', rate1, new_audio)
+
+    exit()
+
 
     mfccInversion = MfccInversion()
     mywav = '../data/one_sec.wav'
@@ -396,22 +476,68 @@ def main():
     print(rate)
     print(data.shape)
 
+    mywav = '../data/save/0_2.wav'
+    rate2, data2_ = wavfile.read(mywav)
+    print(rate2)
+    print(data2_.shape)
+    pos = 100
+    data1 = data2_[int(data2_.shape[0] / (120 * 20))*pos:int(data2_.shape[0] / (120 * 20))*(pos+1), 0]
+    data2 = data2_[int(data2_.shape[0] / (120 * 20))*(pos+1):int(data2_.shape[0] / (120 * 20))*(pos+2), 0]
+    data3 = data2_[int(data2_.shape[0] / (120 * 20))*(pos+2):int(data2_.shape[0] / (120 * 20))*(pos+3), 0]
+    data4 = data2_[int(data2_.shape[0] / (120 * 20))*(pos+3):int(data2_.shape[0] / (120 * 20))*(pos+4), 0]
+    data5 = data2_[int(data2_.shape[0] / (120 * 20))*(pos+4):int(data2_.shape[0] / (120 * 20))*(pos+5), 0]
+    data6 = data2_[int(data2_.shape[0] / (120 * 20))*(pos+5):int(data2_.shape[0] / (120 * 20))*(pos+6), 0]
+
+    print(data2.shape)
+    # print(data2[:data2.shape/(120*25),0])
+    # exit()
+    # data2 = data2[:int(len(data2) / 20)]
+
+
+
     mfcc = mfccInversion.sound2mfcc(data, rate)
     print("mfcc shape")
     print(mfcc.shape)
-    mfcc_reshape = mfcc.reshape((mfccInversion.n_mel_freq_components))
-    print("reshape")
-    print(mfcc_reshape.shape)
-    inverted_mel_audio = mfccInversion.mfcc2sound(mfcc)
 
-    print(inverted_mel_audio.shape)
+    print(rate2)
+    print(data2.shape)
 
-    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio))
-    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio))
-    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio))
-    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio))
+    mfcc1 = mfccInversion.sound2mfcc(data1, rate)
+    mfcc2 = mfccInversion.sound2mfcc(data2, rate)
+    mfcc3 = mfccInversion.sound2mfcc(data3, rate)
+    mfcc4 = mfccInversion.sound2mfcc(data4, rate)
+    mfcc5 = mfccInversion.sound2mfcc(data5, rate)
+    mfcc6 = mfccInversion.sound2mfcc(data6, rate)
+    print("mfcc shape")
+    print(mfcc.shape)
 
-    wavfile.write('download_reconstruct3.wav', rate, inverted_mel_audio)
+    # mfcc = mfcc/2 + mfcc2/2
+    # mfcc = mfcc2
+    # print("mfcc shape")
+    # print(mfcc.shape)
+    # exit()
+
+    # mfcc_reshape = mfcc.reshape((mfccInversion.n_mel_freq_components))
+    # print("reshape")
+    # print(mfcc_reshape.shape)
+    inverted_mel_audio = mfccInversion.mfcc2sound(mfcc1)
+    inverted_mel_audio1 = mfccInversion.mfcc2sound(mfcc2)
+    inverted_mel_audio2 = mfccInversion.mfcc2sound(mfcc3)
+    inverted_mel_audio3 = mfccInversion.mfcc2sound(mfcc4)
+    inverted_mel_audio4 = mfccInversion.mfcc2sound(mfcc5)
+    inverted_mel_audio5 = mfccInversion.mfcc2sound(mfcc6)
+
+    # print(inverted_mel_audio.shape)
+
+    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio1))
+    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio2))
+    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio3))
+    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio4))
+    inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio5))
+    # inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio))
+    # inverted_mel_audio = np.concatenate((inverted_mel_audio,inverted_mel_audio))
+
+    wavfile.write('download_reconstruct_wave.wav', rate, inverted_mel_audio)
     # librosa.output.write_wav('download_reconstruct3.wav', inverted_mel_audio, rate)
 
 

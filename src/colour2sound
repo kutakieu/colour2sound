@@ -1,0 +1,128 @@
+import tensorflow as tf
+import numpy as np
+import sys, getopt
+from python_speech_features import mfcc
+import moviepy.editor as mp
+import librosa
+import cv2
+from src.vectorise_image import image2vector
+from src.mfcc_inversion import MfccInversion
+from scipy.io import wavfile
+
+
+class colour2sound(object):
+    def __init__(self):
+        self.n_input = 512
+        self.graph = tf.Graph()
+        # self.net = self.model2()
+        self.sess, self.net = self.model()
+
+        self.mfccInversion = MfccInversion()
+        self.i2v = image2vector([30,30,3])
+
+    def model(self):
+        with self.graph.as_default():
+            with tf.name_scope("net"):
+                # x = tf.placeholder("float", [None, self.n_input])
+                x = tf.placeholder(tf.float32, shape=(None, self.n_input), name="x-input")
+
+                W_1 = tf.get_variable("W_1", [self.n_input, 1024], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                b_1 = tf.get_variable("b_1", [1024], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                W_2 = tf.get_variable("W_2", [1024, 512], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                b_2 = tf.get_variable("b_2", [512], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                W_3 = tf.get_variable("W_3", [512, 32], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                b_3 = tf.get_variable("b_3", [32], dtype=tf.float32, initializer=tf.random_normal_initializer())
+
+                # W_4 = tf.get_variable("W_4", [1024, 32], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                # b_4 = tf.get_variable("b_4", [32], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                # ReLU
+                output_1 = tf.nn.relu(tf.matmul(x, W_1) + b_1)
+                # Sigmoid
+                # output_1 = tf.nn.dropout(tf.sigmoid(tf.matmul(x, W_1) + b_1), dropout_1)
+
+                # Relu
+                # output_2 = tf.nn.dropout(tf.nn.relu(tf.matmul(output_1, W_2) + b_2), dropout_2)
+                # Sigmoid
+                output_2 = tf.nn.relu(tf.matmul(output_1, W_2) + b_2)
+                # without dropout for this layer
+                # output_2 = tf.nn.relu(tf.matmul(output_1, W_2) + b_2)
+                output_3 = tf.matmul(output_2, W_3) + b_3
+
+            # return output_3
+            saver = tf.train.Saver()
+            with tf.Session() as sess:
+                saver.restore(sess, "../tmp/model.ckpt")
+                with tf.name_scope("prediction"):
+                    # x = tf.placeholder("float", [None, self.n_input])
+                    x = tf.placeholder(tf.float32, shape=(None, self.n_input), name="x-input")
+
+                    W_1 = tf.constant(W_1.eval(), shape=[self.n_input, 1024], dtype=tf.float32)
+                    b_1 = tf.constant(b_1.eval(), shape=[1024], dtype=tf.float32)
+                    W_2 = tf.constant(W_2.eval(), shape=[1024, 512], dtype=tf.float32)
+                    b_2 = tf.constant(b_2.eval(), shape=[512], dtype=tf.float32)
+                    W_3 = tf.constant(W_3.eval(), shape=[512, 32], dtype=tf.float32)
+                    b_3 = tf.constant(b_3.eval(), shape=[32], dtype=tf.float32)
+
+                    output_1 = tf.nn.relu(tf.matmul(x, W_1) + b_1)
+                    output_2 = tf.nn.relu(tf.matmul(output_1, W_2) + b_2)
+                    output_3 = tf.matmul(output_2, W_3) + b_3
+                return sess, output_3
+                # print(sess)
+                # print(b_3.eval())
+                # return output_3
+
+    def model2(self):
+        with self.graph.as_default():
+            with tf.name_scope("net"):
+                # x = tf.placeholder("float", [None, self.n_input])
+                x = tf.placeholder(tf.float32, shape=(None, self.n_input), name="x-input")
+
+                W_1 = tf.constant("W_1", [self.n_input, 1024], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                b_1 = tf.constant("b_1", [1024], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                W_2 = tf.constant("W_2", [1024, 512], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                b_2 = tf.constant("b_2", [512], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                W_3 = tf.constant("W_3", [512, 32], dtype=tf.float32, initializer=tf.random_normal_initializer())
+                b_3 = tf.constant("b_3", [32], dtype=tf.float32, initializer=tf.random_normal_initializer())
+
+                output_1 = tf.nn.relu(tf.matmul(x, W_1) + b_1)
+                output_2 = tf.nn.relu(tf.matmul(output_1, W_2) + b_2)
+                output_3 = tf.matmul(output_2, W_3) + b_3
+                return output_3
+
+    def convert(self, img):
+        img = cv2.resize(img,(30, 30))
+        img = img.reshape((1, 30, 30, 3))
+        image_vector = self.i2v.convert(img)[0,0,0,:]
+        image_vector = image_vector.reshape(1,512)
+        # print(self.graph.get_operations())
+
+        # with self.sess as sess:
+        #     x = self.graph.get_operation_by_name("net/x-input").outputs[0]
+        #
+        #     preded_mfcc = sess.run(self.net, feed_dict={x: image_vector})
+        #     audio = self.mfccInversion.mfcc2sound(preded_mfcc)
+        #     return audio
+        # saver = tf.train.Saver()
+        with tf.Session(graph=self.graph) as sess:
+            # saver.restore(sess, "../tmp/model.ckpt")
+            x = self.graph.get_operation_by_name("prediction/x-input").outputs[0]
+
+            preded_mfcc = sess.run(self.net, feed_dict={x:image_vector})
+            print(preded_mfcc.shape)
+            preded_mfcc = preded_mfcc.reshape(preded_mfcc.shape[1], preded_mfcc.shape[0])
+            print(preded_mfcc.shape)
+        audio = self.mfccInversion.mfcc2sound(preded_mfcc)
+        return audio
+
+
+def main():
+    print("in the colour2sound class")
+    c2s = colour2sound()
+    img = cv2.imread("test.jpg")
+    audio = c2s.convert(img)
+    print(audio.shape)
+    import sounddevice as sd
+    sd.play(audio, 44100, loop=True)
+
+if __name__ == '__main__':
+    main()
